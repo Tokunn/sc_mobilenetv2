@@ -2,7 +2,7 @@
 
 import sys,os
 from tqdm import tqdm
-sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
+sys.path.append('/home/pi/models/research/slim/')
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets
@@ -45,8 +45,9 @@ class ReduceLearningRate(object):
 
 def main():
     x_train, y_train, x_test, y_test, label = input_cifar.get_cifar10(cifarpath)
-    x_train = x_train[:10000]
-    y_train = y_train[:10000]
+    i = 100
+    x_train = x_train[np.random.choice(x_train.shape[0], i)]
+    y_train = y_train[np.random.choice(y_train.shape[0], i)]
     N_CLASSES = len(label)
     print(label)
 
@@ -117,7 +118,7 @@ def main():
 
             n_epochs = 200
             print_every = 32
-            batch_size = 128
+            batch_size = 1
             steps_per_epoch = len(x_train)//batch_size
             steps_per_epoch_val = len(x_test)//batch_size
 
@@ -141,8 +142,8 @@ def main():
 
                 learn_rate = redu_lenrate.get_rate(val_accuracy_list)
 
-                #for step in tqdm(range(steps_per_epoch)):
-                for step in range(steps_per_epoch):
+                #for step in range(steps_per_epoch):
+                for step in tqdm(range(steps_per_epoch)):
                     x_batch = x_train[batch_size*step: batch_size*(step+1)]
                     y_batch = y_train[batch_size*step: batch_size*(step+1)]
 
@@ -165,8 +166,8 @@ def main():
                 if (epoch%1==0):
                     val_loss = []
                     val_accuracy = []
-                    #for step in tqdm(range(steps_per_epoch_val)):
-                    for step in range(steps_per_epoch_val):
+                    #for step in range(steps_per_epoch_val):
+                    for step in tqdm(range(steps_per_epoch_val)):
                         x_batch = x_test[batch_size*step: batch_size*(step+1)]
                         y_batch = y_test[batch_size*step: batch_size*(step+1)]
 
