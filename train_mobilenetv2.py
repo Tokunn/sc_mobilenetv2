@@ -45,8 +45,8 @@ class ReduceLearningRate(object):
 
 def main():
     x_train, y_train, x_test, y_test, label = input_cifar.get_cifar10(cifarpath)
-    #x_train = x_train[:10000]
-    #y_train = y_train[:10000]
+    x_train = x_train[:10000]
+    y_train = y_train[:10000]
     N_CLASSES = len(label)
     print(label)
 
@@ -130,7 +130,7 @@ def main():
                 init_learning_rate = 0.01
 
             redu_lenrate = ReduceLearningRate(
-                    init_val=init_learning_rate, threthold=0.002, cnt_max=15) # initial value, threthold, cnt
+                    init_val=init_learning_rate, threthold=0.002, cnt_max=20) # initial value, threthold, cnt
             val_accuracy_list = []
 
             for epoch in range(n_epochs):
