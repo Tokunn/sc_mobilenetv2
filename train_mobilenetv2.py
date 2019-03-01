@@ -2,7 +2,8 @@
 
 import sys,os
 from tqdm import tqdm
-sys.path.append('/home/pi/models/research/slim/')
+#sys.path.append('/home/pi/models/research/slim/')
+sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets
@@ -45,7 +46,7 @@ class ReduceLearningRate(object):
 
 def main():
     x_train, y_train, x_test, y_test, label = input_cifar.get_cifar10(cifarpath)
-    i = 100
+    i = 10000
     x_train = x_train[np.random.choice(x_train.shape[0], i)]
     y_train = y_train[np.random.choice(y_train.shape[0], i)]
     N_CLASSES = len(label)
@@ -116,7 +117,7 @@ def main():
 
                 #writer = tf.train.SummaryWrite("logs", sess.graph_def)
 
-            n_epochs = 200
+            n_epochs = 200 * 10
             print_every = 32
             batch_size = 1
             steps_per_epoch = len(x_train)//batch_size
@@ -163,7 +164,7 @@ def main():
                 total_tra_loss = np.average(np.asarray(tra_loss))
                 total_tra_acu = np.average(np.asarray(tra_accuracy))
 
-                if (epoch%1==0):
+                if (epoch%10==0):
                     val_loss = []
                     val_accuracy = []
                     #for step in range(steps_per_epoch_val):
