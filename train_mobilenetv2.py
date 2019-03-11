@@ -244,6 +244,7 @@ def main():
                         total_tra_acu,
                         total_val_loss,
                         total_val_acu))
+                    assert not ((np.isnan(total_tra_loss))or(np.isnan(total_tra_acu))or(np.isnan(total_val_loss))or(np.isnan(total_val_acu)))
 
 if __name__ == '__main__':
     main()
