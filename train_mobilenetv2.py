@@ -2,8 +2,8 @@
 
 import sys,os,time
 from tqdm import tqdm
-#sys.path.append('/home/pi/models/research/slim/')
-sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
+sys.path.append('/home/pi/models/research/slim/')
+#sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets
