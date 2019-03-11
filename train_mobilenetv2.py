@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import sys,os
+import sys,os,time
 from tqdm import tqdm
 #sys.path.append('/home/pi/models/research/slim/')
 sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
@@ -13,13 +13,14 @@ import input_cifar
 
 
 cifarpath = "./data/cifar-10-batches-py"
-#snapshot = "./checkpoint/mobilenet_v1_1.0_224.ckpt"
-snapshot = sys.argv[1]
-print(snapshot)
 (IMG_HEIGHT, IMG_WIDTH, N_CHANNELS) = (32, 32, 3)
-#ALPHA = 1.0 # depth
+
+snapshot = sys.argv[1]
 ALPHA = float(sys.argv[2])
 load_weight = int(sys.argv[3])
+div_rate = int(sys.argv[4])
+n_batch_size = int(sys.argv[5])
+print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size)
 
 class ReduceLearningRate(object):
     def __init__(self, init_val, threthold, cnt_max):
@@ -30,15 +31,15 @@ class ReduceLearningRate(object):
     def get_rate(self, val_acc_list):
         if len(val_acc_list) > 1:
             diff = val_acc_list[-1] - val_acc_list[-2]
-            print("val acu diff {:0.4f}".format(diff), flush=True, end=' ')
+            #print("val_acu_diff:{:0.4f}".format(diff), flush=True, end=' ')
             if (diff < self.threthold):
                 self.counter += 1
                 if (self.counter >= self.cnt_max):
                     self.learn_rate /= 10
                     self.counter = 0
                     print("[Reduce learning rate]", flush=True, end=' ')
-                else:
-                    print("                      ", end=' ')
+                #else:
+                    #print("                      ", end=' ')
             else:
                 self.counter = 0
         print("lean rate : {:0.8f}".format(self.learn_rate), flush=True, end=' ')
@@ -46,11 +47,20 @@ class ReduceLearningRate(object):
 
 def main():
     x_train, y_train, x_test, y_test, label = input_cifar.get_cifar10(cifarpath)
-    i = 10000
-    x_train = x_train[np.random.choice(x_train.shape[0], i)]
-    y_train = y_train[np.random.choice(y_train.shape[0], i)]
+    n_img = x_train.shape[0] // div_rate
+    if (n_img > 0):
+        print("n_img:", n_img)
+        i = n_img
+        choices_list = np.random.choice(x_train.shape[0], i)
+        x_train = x_train[choices_list]
+        y_train = y_train[choices_list]
+    else:
+        print("normal")
     N_CLASSES = len(label)
     print(label)
+
+
+    #############################################################################################
 
 
     graph = tf.Graph()
@@ -81,11 +91,20 @@ def main():
             #tf.losses.softmax_cross_entropy(onehot_labels=y, logits=logits)
             loss = tf.losses.get_total_loss()
 
+        # Transfer Learning
         with tf.variable_scope('opt') as scope:
+            learning_vars = tf.contrib.framework.get_variables('MobilenetV1/Logits')
             optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
             with tf.control_dependencies(update_ops):
-                train_op = optimizer.minimize(loss, name="train_op")
+                train_op = optimizer.minimize(loss, var_list=learning_vars, name="train_op")
+
+#        # Fine-Tuning
+#        with tf.variable_scope('opt') as scope:
+#            optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
+#            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
+#            with tf.control_dependencies(update_ops):
+#                train_op = optimizer.minimize(loss, name="train_op")
 
         with tf.variable_scope('eval') as scope:
             accuracy = tf.reduce_mean(
@@ -117,9 +136,9 @@ def main():
 
                 #writer = tf.train.SummaryWrite("logs", sess.graph_def)
 
-            n_epochs = 200 * 10
+            n_epochs = 200 * div_rate
             print_every = 32
-            batch_size = 1
+            batch_size = n_batch_size
             steps_per_epoch = len(x_train)//batch_size
             steps_per_epoch_val = len(x_test)//batch_size
 
@@ -127,15 +146,16 @@ def main():
             if load_weight:
                 print("Load pretrained weights")
                 pretrained_saver.restore(sess, snapshot)
-                init_learning_rate = 0.0001
+                init_learning_rate = 0.001
             else:
                 init_learning_rate = 0.01
 
             redu_lenrate = ReduceLearningRate(
-                    init_val=init_learning_rate, threthold=0.002, cnt_max=20) # initial value, threthold, cnt
+                    init_val=init_learning_rate, threthold=0.002/div_rate, cnt_max=20*div_rate) # initial value, threthold, cnt
             val_accuracy_list = []
 
             for epoch in range(n_epochs):
+                epoch_start = time.time()
                 print("Epoch: {: 3d}/{: 3d} ".format(epoch, n_epochs), end=' ')
 
                 tra_loss = []
@@ -143,8 +163,8 @@ def main():
 
                 learn_rate = redu_lenrate.get_rate(val_accuracy_list)
 
-                #for step in range(steps_per_epoch):
-                for step in tqdm(range(steps_per_epoch)):
+                #for step in tqdm(range(steps_per_epoch)):
+                for step in range(steps_per_epoch):
                     x_batch = x_train[batch_size*step: batch_size*(step+1)]
                     y_batch = y_train[batch_size*step: batch_size*(step+1)]
 
@@ -164,11 +184,11 @@ def main():
                 total_tra_loss = np.average(np.asarray(tra_loss))
                 total_tra_acu = np.average(np.asarray(tra_accuracy))
 
-                if (epoch%10==0):
+                if (epoch%1==0):
                     val_loss = []
                     val_accuracy = []
-                    #for step in range(steps_per_epoch_val):
-                    for step in tqdm(range(steps_per_epoch_val)):
+                    #for step in tqdm(range(steps_per_epoch_val)):
+                    for step in range(steps_per_epoch_val):
                         x_batch = x_test[batch_size*step: batch_size*(step+1)]
                         y_batch = y_test[batch_size*step: batch_size*(step+1)]
 
@@ -183,7 +203,9 @@ def main():
                     total_val_acu = np.average(np.asarray(val_accuracy))
                     val_accuracy_list.append(total_val_acu)
 
-                    print("tra loss: {:0.4f} tra acc: {:0.4f} val loss: {:0.4f} val acc: {:0.4f}".format(
+                    epoch_finish = time.time()
+                    print("time:{:4.4f} tra_loss:{:0.4f} tra_acc:{:0.4f} val_loss:{:0.4f} val_acc:{:0.4f}".format(
+                        epoch_finish-epoch_start,
                         total_tra_loss,
                         total_tra_acu,
                         total_val_loss,
