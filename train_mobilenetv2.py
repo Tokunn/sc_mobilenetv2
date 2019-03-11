@@ -10,6 +10,7 @@ import tensorflow.contrib.slim.nets
 import nets.mobilenet_v1
 import numpy as np
 import input_cifar
+import matplotlib.pyplot as plt
 
 
 cifarpath = "./data/cifar-10-batches-py"
@@ -45,19 +46,46 @@ class ReduceLearningRate(object):
         print("lean rate : {:0.8f}".format(self.learn_rate), flush=True, end=' ')
         return self.learn_rate
 
+def make_small_set(n_classes, x, y, div_rate):
+    small_x = []
+    small_y = []
+    n_img = 0
+    for i in range(n_classes):
+        each_class_list = x[y==i]
+        each_n_img = each_class_list.shape[0]
+        choices_list = np.random.choice(each_class_list.shape[0], each_n_img//div_rate)
+        each_class_list = each_class_list[choices_list]
+        small_x.append(each_class_list)
+        small_y.append([i]*(each_n_img//div_rate))
+        n_img += len(each_class_list)
+
+    small_x = np.asarray(small_x)
+    small_x = np.reshape(small_x, (n_img, small_x.shape[2], small_x.shape[3], small_x.shape[4]))
+    print(small_x.shape)
+    small_y = np.asarray(small_y)
+    small_y = np.reshape(small_y, -1)
+    print(small_y.shape)
+    p = np.random.permutation(len(small_x))
+    x = small_x[p]
+    y = small_y[p]
+    print(y)
+    
+    return x, y
+
+
 def main():
     x_train, y_train, x_test, y_test, label = input_cifar.get_cifar10(cifarpath)
-    n_img = x_train.shape[0] // div_rate
-    if (n_img > 0):
-        print("n_img:", n_img)
-        i = n_img
-        choices_list = np.random.choice(x_train.shape[0], i)
-        x_train = x_train[choices_list]
-        y_train = y_train[choices_list]
+    N_CLASSES = 2
+    #N_CLASSES = len(label)
+    print(label)
+
+    # div images
+    if (div_rate >= 1):
+        x_train, y_train = make_small_set(N_CLASSES, x_train, y_train, div_rate)
+        x_test, y_test = make_small_set(N_CLASSES, x_test, y_test, div_rate=1)
+
     else:
         print("normal")
-    N_CLASSES = len(label)
-    print(label)
 
 
     #############################################################################################
