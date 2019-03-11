@@ -2,8 +2,8 @@
 
 import sys,os,time
 from tqdm import tqdm
-#sys.path.append('/home/pi/models/research/slim/')
-sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
+sys.path.append('/home/pi/models/research/slim/')
+#sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets
@@ -21,7 +21,11 @@ ALPHA = float(sys.argv[2])
 load_weight = int(sys.argv[3])
 div_rate = int(sys.argv[4])
 n_batch_size = int(sys.argv[5])
-print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size)
+if (len(sys.argv) >= 6):
+    N_CLASSES = int(sys.argv[6])
+else:
+    N_CLASSES = 0
+print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size,"N_CLASSES:",N_CLASSES)
 
 class ReduceLearningRate(object):
     def __init__(self, init_val, threthold, cnt_max):
@@ -61,10 +65,10 @@ def make_small_set(n_classes, x, y, div_rate):
 
     small_x = np.asarray(small_x)
     small_x = np.reshape(small_x, (n_img, small_x.shape[2], small_x.shape[3], small_x.shape[4]))
-    print(small_x.shape)
+    print(small_x.shape, end=' ')
     small_y = np.asarray(small_y)
     small_y = np.reshape(small_y, -1)
-    print(small_y.shape)
+    print(small_y.shape, end=' ')
     p = np.random.permutation(len(small_x))
     x = small_x[p]
     y = small_y[p]
@@ -75,14 +79,16 @@ def make_small_set(n_classes, x, y, div_rate):
 
 def main():
     x_train, y_train, x_test, y_test, label = input_cifar.get_cifar10(cifarpath)
-    N_CLASSES = 2
-    #N_CLASSES = len(label)
+    if (N_CLASSES > 0):
+        n_classes = N_CLASSES
+    else:
+        n_classes = len(label)
     print(label)
 
     # div images
     if (div_rate >= 1):
-        x_train, y_train = make_small_set(N_CLASSES, x_train, y_train, div_rate)
-        x_test, y_test = make_small_set(N_CLASSES, x_test, y_test, div_rate=1)
+        x_train, y_train = make_small_set(n_classes, x_train, y_train, div_rate)
+        x_test, y_test = make_small_set(n_classes, x_test, y_test, div_rate=1)
 
     else:
         print("normal")
