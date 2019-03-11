@@ -2,12 +2,14 @@
 
 import sys,os,time
 from tqdm import tqdm
-sys.path.append('/home/pi/models/research/slim/')
-#sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
+#sys.path.append('/home/pi/models/research/slim/')
+sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets
-import nets.mobilenet_v1
+#import nets.mobilenet_v1
+from nets import mobilenet_v1
+from nets.mobilenet import mobilenet_v2
 import numpy as np
 import input_cifar
 import matplotlib.pyplot as plt
@@ -109,10 +111,12 @@ def main():
             y_onehot = tf.one_hot(y, depth=N_CLASSES)
             #x_pad = tf.image.resize_image_with_crop_or_pad(x, 160, 160)
 
-        with tf.name_scope("mobilenet_v1") as scope:
-            arg_scope = nets.mobilenet_v1.mobilenet_v1_arg_scope()
+        with tf.name_scope("mobilenet_v2") as scope:
+            arg_scope = mobilenet_v2.training_scope()
+            #arg_scope = mobilenet_v1.mobilenet_v1_arg_scope()
             with tf.contrib.framework.arg_scope(arg_scope):
-                logits, end_points = nets.mobilenet_v1.mobilenet_v1(
+                #logits, end_points = mobilenet_v1.mobilenet_v1(
+                logits, end_points = mobilenet_v2.mobilenet(
                         x,
                         num_classes=N_CLASSES,
                         depth_multiplier=ALPHA,
@@ -127,8 +131,11 @@ def main():
 
         # Transfer Learning
         with tf.variable_scope('opt') as scope:
-            learning_vars = tf.contrib.framework.get_variables('MobilenetV1/Logits')
-            learning_vars += tf.contrib.framework.get_variables('MobilenetV1/Predictions')
+            #learning_vars = tf.contrib.framework.get_variables('MobilenetV1/Logits')
+            #learning_vars += tf.contrib.framework.get_variables('MobilenetV1/Predictions')
+            learning_vars = tf.contrib.framework.get_variables('MobilenetV2/Logits')
+            learning_vars += tf.contrib.framework.get_variables('MobilenetV2/Predictions')
+            learning_vars += tf.contrib.framework.get_variables('MobilenetV2/predics')
             optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
             with tf.control_dependencies(update_ops):
@@ -147,8 +154,8 @@ def main():
                         tf.equal(tf.argmax(y_p, 1), tf.argmax(y_onehot, 1)), tf.float32)
                     )
 
-        pretrained_include = ["MobilenetV1"]
-        pretrained_exclude = ["MobilenetV1/Predictions", "MobilenetV1/Logits"]
+        pretrained_include = ["MobilenetV2"]
+        pretrained_exclude = ["MobilenetV2/Predictions", "MobilenetV2/Logits", "MobilenetV2/predics"]
 
         pretrained_vars = tf.contrib.framework.get_variables_to_restore(
                 include = pretrained_include,
