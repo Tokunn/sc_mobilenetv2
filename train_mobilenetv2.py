@@ -128,6 +128,7 @@ def main():
         # Transfer Learning
         with tf.variable_scope('opt') as scope:
             learning_vars = tf.contrib.framework.get_variables('MobilenetV1/Logits')
+            learning_vars += tf.contrib.framework.get_variables('MobilenetV1/Predictions')
             optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
             with tf.control_dependencies(update_ops):
