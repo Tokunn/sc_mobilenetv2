@@ -20,7 +20,7 @@ import argparse
 
 
 cifarpath = "./data/cifar-10-batches-py"
-(IMG_HEIGHT, IMG_WIDTH, N_CHANNELS) = (32, 32, 3)
+(IMG_HEIGHT, IMG_WIDTH, N_CHANNELS) = (224, 224, 3)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('snapshot')
@@ -133,6 +133,8 @@ def center_crop(image, crop_size):
 def random_crop(image, crop_size):
     crop_size = check_size(crop_size)
     h, w, _ = image.shape
+    if (h==crop_size[0]):
+        return image
     top = np.random.randint(0, h - crop_size[0])
     left = np.random.randint(0, w - crop_size[1])
     bottom = top + crop_size[0]
@@ -155,6 +157,7 @@ def vertical_flip(image, rate=0.5):
 
 def scale_augmentation(image, scale_range, crop_size):
     scale_size = np.random.randint(*scale_range)
+    #print(scale_size)
     image = imresize(image, (scale_size, scale_size))
     image = random_crop(image, crop_size)
     return image
@@ -169,8 +172,10 @@ def random_rotation(image, angle_range=(0, 4)):
     return image
 
 
+
 def main():
     x_train, y_train, x_test, y_test, label = input_cifar.get_cifar10(cifarpath)
+    
     if (N_CLASSES > 0):
         n_classes = N_CLASSES
     else:
@@ -181,9 +186,18 @@ def main():
     if (div_rate >= 1):
         x_train, y_train = make_small_set(n_classes, x_train, y_train, div_rate)
         x_test, y_test = make_small_set(n_classes, x_test, y_test, div_rate=1)
-
     else:
         print("normal")
+
+    # extend images
+    x_train224 = []
+    for i in range(len(x_train)):
+        x_train224.append(resize(x_train[i], (IMG_WIDTH, IMG_HEIGHT)))
+    x_train = np.asarray(x_train224)
+    x_test224 = []
+    for i in range(len(x_test)):
+        x_test224.append(resize(x_test[i], (IMG_WIDTH, IMG_HEIGHT)))
+    x_test = np.asarray(x_test224)
 
 
     #############################################################################################
@@ -218,6 +232,7 @@ def main():
             tf.losses.sparse_softmax_cross_entropy(labels=y, logits=logits)
             #tf.losses.softmax_cross_entropy(onehot_labels=y, logits=logits)
             loss = tf.losses.get_total_loss()
+            loss = tf.clip_by_value(loss, 10e-10, 1000000)
 
         with tf.variable_scope('opt') as scope:
             # Transfer Learning
@@ -271,7 +286,7 @@ def main():
                 #writer = tf.train.SummaryWrite("logs", sess.graph_def)
 
             n_epochs = 200 * div_rate
-            n_epochs = 50 # For RPI
+            #n_epochs = 50 # For RPI
             print_every = 32
             batch_size = n_batch_size
             steps_per_epoch = len(x_train)//batch_size
@@ -287,7 +302,7 @@ def main():
 
             redu_lenrate = ReduceLearningRate(
                     #init_val=init_learning_rate, threthold=0.002/div_rate, cnt_max=20*div_rate) # initial value, threthold, cnt
-                    init_val=init_learning_rate, threthold=0.002, cnt_max=20) # initial value, threthold, cnt
+                    init_val=init_learning_rate, threthold=0.02, cnt_max=40) # initial value, threthold, cnt
             val_accuracy_list = []
 
             for epoch in range(n_epochs):
@@ -306,8 +321,9 @@ def main():
 
                     # augmentation
                     for i in range(len(x_batch)):
-                        x_batch[i] = random_rotation(x_batch[i])
-                        #save_image(x_batch[i], 'img_tmp/'+str(i)+'.png')
+                        #x_batch[i] = scale_augmentation(x_batch[i], (1*IMG_WIDTH, int(1.5*IMG_WIDTH)), IMG_WIDTH)
+                        x_batch[i] = horizontal_flip(x_batch[i])
+                        save_image(x_batch[i], 'img_tmp/'+str(i)+'.png')
 
                     feed_dict = {x : x_batch,
                                  y : y_batch,
