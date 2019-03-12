@@ -271,6 +271,7 @@ def main():
                 #writer = tf.train.SummaryWrite("logs", sess.graph_def)
 
             n_epochs = 200 * div_rate
+            n_epochs = 50 # For RPI
             print_every = 32
             batch_size = n_batch_size
             steps_per_epoch = len(x_train)//batch_size
