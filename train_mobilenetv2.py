@@ -2,8 +2,8 @@
 
 import sys,os,time
 from tqdm import tqdm
-sys.path.append('/home/pi/models/research/slim/')
-#sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
+#sys.path.append('/home/pi/models/research/slim/')
+sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets
@@ -13,6 +13,9 @@ from nets.mobilenet import mobilenet_v2
 import numpy as np
 import input_cifar
 import matplotlib.pyplot as plt
+from PIL import Image
+from scipy.misc import imresize
+from scipy.ndimage.interpolation import rotate
 
 
 cifarpath = "./data/cifar-10-batches-py"
@@ -49,7 +52,7 @@ class ReduceLearningRate(object):
                     #print("                      ", end=' ')
             else:
                 self.counter = 0
-        print("lean rate : {:0.8f}".format(self.learn_rate), flush=True, end=' ')
+        print("leanrate:{:0.8f}".format(self.learn_rate), flush=True, end=' ')
         return self.learn_rate
 
 def make_small_set(n_classes, x, y, div_rate):
@@ -77,6 +80,75 @@ def make_small_set(n_classes, x, y, div_rate):
     print(y)
     
     return x, y
+
+# https://raw.githubusercontent.com/xkumiyu/numpy-data-augmentation/master/process_image.py
+def save_image(image, imagefile, data_format='channel_last'):
+    image = np.asarray(image, dtype=np.uint8)
+    image = Image.fromarray(image)
+    image.save(imagefile)
+
+def check_size(size):
+    if type(size) == int:
+        size = (size, size)
+    if type(size) != tuple:
+        raise TypeError('size is int or tuple')
+    return size
+
+
+def resize(image, size):
+    size = check_size(size)
+    image = imresize(image, size)
+    return image
+
+
+def center_crop(image, crop_size):
+    crop_size = check_size(crop_size)
+    h, w, _ = image.shape
+    top = (h - crop_size[0]) // 2
+    left = (w - crop_size[1]) // 2
+    bottom = top + crop_size[0]
+    right = left + crop_size[1]
+    image = image[top:bottom, left:right, :]
+    return image
+
+
+def random_crop(image, crop_size):
+    crop_size = check_size(crop_size)
+    h, w, _ = image.shape
+    top = np.random.randint(0, h - crop_size[0])
+    left = np.random.randint(0, w - crop_size[1])
+    bottom = top + crop_size[0]
+    right = left + crop_size[1]
+    image = image[top:bottom, left:right, :]
+    return image
+
+
+def horizontal_flip(image, rate=0.5):
+    if np.random.rand() < rate:
+        image = image[:, ::-1, :]
+    return image
+
+
+def vertical_flip(image, rate=0.5):
+    if np.random.rand() < rate:
+        image = image[::-1, :, :]
+    return image
+
+
+def scale_augmentation(image, scale_range, crop_size):
+    scale_size = np.random.randint(*scale_range)
+    image = imresize(image, (scale_size, scale_size))
+    image = random_crop(image, crop_size)
+    return image
+
+
+def random_rotation(image, angle_range=(0, 4)):
+    angle_list = [0, 90, 180, 270]
+    h, w, _ = image.shape
+    angle = angle_list[np.random.randint(*angle_range)]
+    image = rotate(image, angle)
+    image = resize(image, (h, w))
+    return image
 
 
 def main():
@@ -133,13 +205,15 @@ def main():
         with tf.variable_scope('opt') as scope:
             #learning_vars = tf.contrib.framework.get_variables('MobilenetV1/Logits')
             #learning_vars += tf.contrib.framework.get_variables('MobilenetV1/Predictions')
-            learning_vars = tf.contrib.framework.get_variables('MobilenetV2/Logits')
-            learning_vars += tf.contrib.framework.get_variables('MobilenetV2/Predictions')
-            learning_vars += tf.contrib.framework.get_variables('MobilenetV2/predics')
+
+            #learning_vars = tf.contrib.framework.get_variables('MobilenetV2/Logits')
+            #learning_vars += tf.contrib.framework.get_variables('MobilenetV2/Predictions')
+            #learning_vars += tf.contrib.framework.get_variables('MobilenetV2/predics')
             optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
             update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
             with tf.control_dependencies(update_ops):
-                train_op = optimizer.minimize(loss, var_list=learning_vars, name="train_op")
+                train_op = optimizer.minimize(loss, name="train_op")
+                #train_op = optimizer.minimize(loss, var_list=learning_vars, name="train_op")
 
 #        # Fine-Tuning
 #        with tf.variable_scope('opt') as scope:
@@ -209,6 +283,11 @@ def main():
                 for step in range(steps_per_epoch):
                     x_batch = x_train[batch_size*step: batch_size*(step+1)]
                     y_batch = y_train[batch_size*step: batch_size*(step+1)]
+
+                    # augmentation
+                    for i in range(len(x_batch)):
+                        x_batch[i] = random_rotation(x_batch[i])
+                        #save_image(x_batch[i], 'img_tmp/'+str(i)+'.png')
 
                     feed_dict = {x : x_batch,
                                  y : y_batch,
