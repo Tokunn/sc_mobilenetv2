@@ -3,7 +3,7 @@
 import sys,os,time
 from tqdm import tqdm
 sys.path.append('/home/pi/models/research/slim/')
-#sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
+sys.path.append(os.path.expanduser('~/Documents/tensorflow/mobilenet_v2/models/research/slim/'))
 import tensorflow as tf
 import tensorflow.contrib.slim as slim
 import tensorflow.contrib.slim.nets
@@ -16,21 +16,39 @@ import matplotlib.pyplot as plt
 from PIL import Image
 from scipy.misc import imresize
 from scipy.ndimage.interpolation import rotate
+import argparse
 
 
 cifarpath = "./data/cifar-10-batches-py"
 (IMG_HEIGHT, IMG_WIDTH, N_CHANNELS) = (32, 32, 3)
 
-snapshot = sys.argv[1]
-ALPHA = float(sys.argv[2])
-load_weight = int(sys.argv[3])
-div_rate = int(sys.argv[4])
-n_batch_size = int(sys.argv[5])
-if (len(sys.argv) >= 6):
-    N_CLASSES = int(sys.argv[6])
-else:
-    N_CLASSES = 0
-print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size,"N_CLASSES:",N_CLASSES)
+parser = argparse.ArgumentParser()
+parser.add_argument('snapshot')
+parser.add_argument('--ALPHA', type=float, default=1.0)
+parser.add_argument('--load_weight', type=int, default=1)
+parser.add_argument('--div_rate', type=int, default=100)
+parser.add_argument('--n_batch_size', type=int, default=64)
+parser.add_argument('--N_CLASSES', type=int, default=2)
+parser.add_argument('--translearn', type=int, default=0)
+args = parser.parse_args()
+snapshot = args.snapshot
+ALPHA = args.ALPHA
+load_weight = args.load_weight
+div_rate = args.div_rate
+n_batch_size = args.n_batch_size
+N_CLASSES = args.N_CLASSES
+translearn = args.translearn
+
+
+#snapshot = sys.argv[1]
+#ALPHA = float(sys.argv[2])
+#load_weight = int(sys.argv[3])
+#div_rate = int(sys.argv[4])
+#n_batch_size = int(sys.argv[5])
+#N_CLASSES = int(sys.argv[6])
+#translearn = int(sys.argv[7])
+
+print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size,"N_CLASSES:",N_CLASSES,"TransLearn:",translearn)
 
 class ReduceLearningRate(object):
     def __init__(self, init_val, threthold, cnt_max):
@@ -201,26 +219,26 @@ def main():
             #tf.losses.softmax_cross_entropy(onehot_labels=y, logits=logits)
             loss = tf.losses.get_total_loss()
 
-        # Transfer Learning
         with tf.variable_scope('opt') as scope:
-            #learning_vars = tf.contrib.framework.get_variables('MobilenetV1/Logits')
-            #learning_vars += tf.contrib.framework.get_variables('MobilenetV1/Predictions')
+            # Transfer Learning
+            if translearn:
+                #learning_vars = tf.contrib.framework.get_variables('MobilenetV1/Logits')
+                #learning_vars += tf.contrib.framework.get_variables('MobilenetV1/Predictions')
 
-            #learning_vars = tf.contrib.framework.get_variables('MobilenetV2/Logits')
-            #learning_vars += tf.contrib.framework.get_variables('MobilenetV2/Predictions')
-            #learning_vars += tf.contrib.framework.get_variables('MobilenetV2/predics')
-            optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
-            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
-            with tf.control_dependencies(update_ops):
-                train_op = optimizer.minimize(loss, name="train_op")
-                #train_op = optimizer.minimize(loss, var_list=learning_vars, name="train_op")
+                learning_vars = tf.contrib.framework.get_variables('MobilenetV2/Logits')
+                learning_vars += tf.contrib.framework.get_variables('MobilenetV2/Predictions')
+                learning_vars += tf.contrib.framework.get_variables('MobilenetV2/predics')
+                optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
+                update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
+                with tf.control_dependencies(update_ops):
+                    train_op = optimizer.minimize(loss, var_list=learning_vars, name="train_op")
 
-#        # Fine-Tuning
-#        with tf.variable_scope('opt') as scope:
-#            optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
-#            update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
-#            with tf.control_dependencies(update_ops):
-#                train_op = optimizer.minimize(loss, name="train_op")
+            else:
+                # Fine-Tuning
+                optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
+                update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
+                with tf.control_dependencies(update_ops):
+                    train_op = optimizer.minimize(loss, name="train_op")
 
         with tf.variable_scope('eval') as scope:
             accuracy = tf.reduce_mean(
@@ -262,12 +280,13 @@ def main():
             if load_weight:
                 print("Load pretrained weights")
                 pretrained_saver.restore(sess, snapshot)
-                init_learning_rate = 0.001
+                init_learning_rate = 0.0001
             else:
                 init_learning_rate = 0.01
 
             redu_lenrate = ReduceLearningRate(
-                    init_val=init_learning_rate, threthold=0.002/div_rate, cnt_max=20*div_rate) # initial value, threthold, cnt
+                    #init_val=init_learning_rate, threthold=0.002/div_rate, cnt_max=20*div_rate) # initial value, threthold, cnt
+                    init_val=init_learning_rate, threthold=0.002, cnt_max=20) # initial value, threthold, cnt
             val_accuracy_list = []
 
             for epoch in range(n_epochs):
