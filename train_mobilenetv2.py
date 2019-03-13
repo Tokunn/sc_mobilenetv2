@@ -31,6 +31,7 @@ parser.add_argument('--N_CLASSES', type=int, default=2)
 parser.add_argument('--translearn', type=int, default=0)
 parser.add_argument('--rpi', type=int, default=0)
 parser.add_argument('--train_conv1', type=int, default=0)
+parser.add_argument('--train_conv16', type=int, default=0)
 args = parser.parse_args()
 snapshot = args.snapshot
 ALPHA = args.ALPHA
@@ -41,9 +42,12 @@ N_CLASSES = args.N_CLASSES
 translearn = args.translearn
 TEST_ON_RPI = args.rpi
 train_conv1 = args.train_conv1
+train_conv16 = args.train_conv16
 
 if (train_conv1):
     assert translearn
+if (train_conv16):
+    assert train_conv1
 
 
 #snapshot = sys.argv[1]
@@ -251,6 +255,8 @@ def main():
                 learning_vars += tf.contrib.framework.get_variables('MobilenetV2/predics')
                 if train_conv1:
                     learning_vars += tf.contrib.framework.get_variables('MobilenetV2/Conv_1')
+                if train_conv16:
+                    learning_vars += tf.contrib.framework.get_variables('MobilenetV2/expanded_conv_16')
                 optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
                 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
                 with tf.control_dependencies(update_ops):
@@ -295,7 +301,7 @@ def main():
                     #writer = tf.train.SummaryWrite("logs", sess.graph_def)
 
             #n_epochs = 200 * div_rate
-            n_epochs = 200 # For relation_of_divrate
+            n_epochs = 50
             if TEST_ON_RPI:
                 n_epochs = 10 # For RPI
             print_every = 32
