@@ -32,6 +32,7 @@ parser.add_argument('--translearn', type=int, default=0)
 parser.add_argument('--rpi', type=int, default=0)
 parser.add_argument('--train_conv1', type=int, default=0)
 parser.add_argument('--train_conv16', type=int, default=0)
+parser.add_argument('--epoch', type=int, default=50)
 args = parser.parse_args()
 snapshot = args.snapshot
 ALPHA = args.ALPHA
@@ -43,6 +44,7 @@ translearn = args.translearn
 TEST_ON_RPI = args.rpi
 train_conv1 = args.train_conv1
 train_conv16 = args.train_conv16
+n_epochs = args.epoch
 
 if (train_conv1):
     assert translearn
@@ -58,7 +60,7 @@ if (train_conv16):
 #N_CLASSES = int(sys.argv[6])
 #translearn = int(sys.argv[7])
 
-print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size,"N_CLASSES:",N_CLASSES,"TransLearn:",translearn,"conv1:",train_conv1)
+print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size,"N_CLASSES:",N_CLASSES,"TransLearn:",translearn,"conv1:",train_conv1,"n_epochs:",n_epochs)
 
 class ReduceLearningRate(object):
     def __init__(self, init_val, threthold, cnt_max):
@@ -300,8 +302,8 @@ def main():
 
                     #writer = tf.train.SummaryWrite("logs", sess.graph_def)
 
-            #n_epochs = 200 * div_rate
-            n_epochs = 50
+            global n_epochs
+
             if TEST_ON_RPI:
                 n_epochs = 10 # For RPI
             print_every = 32
