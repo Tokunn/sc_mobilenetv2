@@ -30,6 +30,7 @@ parser.add_argument('--n_batch_size', type=int, default=64)
 parser.add_argument('--N_CLASSES', type=int, default=2)
 parser.add_argument('--translearn', type=int, default=0)
 parser.add_argument('--rpi', type=int, default=0)
+parser.add_argument('--train_conv1', type=int, default=0)
 args = parser.parse_args()
 snapshot = args.snapshot
 ALPHA = args.ALPHA
@@ -39,6 +40,10 @@ n_batch_size = args.n_batch_size
 N_CLASSES = args.N_CLASSES
 translearn = args.translearn
 TEST_ON_RPI = args.rpi
+train_conv1 = args.train_conv1
+
+if (train_conv1):
+    assert translearn
 
 
 #snapshot = sys.argv[1]
@@ -49,7 +54,7 @@ TEST_ON_RPI = args.rpi
 #N_CLASSES = int(sys.argv[6])
 #translearn = int(sys.argv[7])
 
-print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size,"N_CLASSES:",N_CLASSES,"TransLearn:",translearn)
+print("snapshotfile:",snapshot,"ALPHA:",ALPHA,"load_weight:",load_weight,"div_rate:",div_rate,"n_batch_size:",n_batch_size,"N_CLASSES:",N_CLASSES,"TransLearn:",translearn,"conv1:",train_conv1)
 
 class ReduceLearningRate(object):
     def __init__(self, init_val, threthold, cnt_max):
@@ -244,6 +249,8 @@ def main():
                 learning_vars = tf.contrib.framework.get_variables('MobilenetV2/Logits')
                 learning_vars += tf.contrib.framework.get_variables('MobilenetV2/Predictions')
                 learning_vars += tf.contrib.framework.get_variables('MobilenetV2/predics')
+                if train_conv1:
+                    learning_vars += tf.contrib.framework.get_variables('MobilenetV2/Conv_1')
                 optimizer = tf.train.AdamOptimizer(adam_alpha, name="optimizer")
                 update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS) 
                 with tf.control_dependencies(update_ops):
