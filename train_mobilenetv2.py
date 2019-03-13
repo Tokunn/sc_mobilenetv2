@@ -18,7 +18,6 @@ from scipy.misc import imresize
 from scipy.ndimage.interpolation import rotate
 import argparse
 
-
 cifarpath = "./data/cifar-10-batches-py"
 (IMG_HEIGHT, IMG_WIDTH, N_CHANNELS) = (224, 224, 3)
 
@@ -30,6 +29,7 @@ parser.add_argument('--div_rate', type=int, default=100)
 parser.add_argument('--n_batch_size', type=int, default=64)
 parser.add_argument('--N_CLASSES', type=int, default=2)
 parser.add_argument('--translearn', type=int, default=0)
+parser.add_argument('--rpi', type=int, default=0)
 args = parser.parse_args()
 snapshot = args.snapshot
 ALPHA = args.ALPHA
@@ -38,6 +38,7 @@ div_rate = args.div_rate
 n_batch_size = args.n_batch_size
 N_CLASSES = args.N_CLASSES
 translearn = args.translearn
+TEST_ON_RPI = args.rpi
 
 
 #snapshot = sys.argv[1]
@@ -274,19 +275,22 @@ def main():
 
 
         with tf.Session(graph=graph) as sess:
-            with tf.variable_scope('tensorboard') as scope:
-                tf.summary_write = tf.summary.FileWriter('logs', graph=sess.graph)
-                tf.dummy_summary = tf.summary.scalar(name="dummy", tensor=1)
+            if not TEST_ON_RPI:
+                with tf.variable_scope('tensorboard') as scope:
+                    tf.summary_write = tf.summary.FileWriter('logs', graph=sess.graph)
+                    tf.dummy_summary = tf.summary.scalar(name="dummy", tensor=1)
 
-                #tra_loss_summary = tf.scalar_summary("training_loss", loss)
-                #tra_accu_summary = tf.scalar_summary("training_accuracy", accuracy)
-                #val_loss_summary = tf.scalar_summary("valication_loss", loss)
-                #val_accu_summary = tf.scalar_summary("valication_accuracy", accuracy)
+                    #tra_loss_summary = tf.scalar_summary("training_loss", loss)
+                    #tra_accu_summary = tf.scalar_summary("training_accuracy", accuracy)
+                    #val_loss_summary = tf.scalar_summary("valication_loss", loss)
+                    #val_accu_summary = tf.scalar_summary("valication_accuracy", accuracy)
 
-                #writer = tf.train.SummaryWrite("logs", sess.graph_def)
+                    #writer = tf.train.SummaryWrite("logs", sess.graph_def)
 
-            n_epochs = 200 * div_rate
-            #n_epochs = 50 # For RPI
+            #n_epochs = 200 * div_rate
+            n_epochs = 200 # For relation_of_divrate
+            if TEST_ON_RPI:
+                n_epochs = 10 # For RPI
             print_every = 32
             batch_size = n_batch_size
             steps_per_epoch = len(x_train)//batch_size
@@ -302,7 +306,7 @@ def main():
 
             redu_lenrate = ReduceLearningRate(
                     #init_val=init_learning_rate, threthold=0.002/div_rate, cnt_max=20*div_rate) # initial value, threthold, cnt
-                    init_val=init_learning_rate, threthold=0.02, cnt_max=40) # initial value, threthold, cnt
+                    init_val=init_learning_rate, threthold=0.002, cnt_max=200) # initial value, threthold, cnt
             val_accuracy_list = []
 
             for epoch in range(n_epochs):
@@ -323,7 +327,8 @@ def main():
                     for i in range(len(x_batch)):
                         #x_batch[i] = scale_augmentation(x_batch[i], (1*IMG_WIDTH, int(1.5*IMG_WIDTH)), IMG_WIDTH)
                         x_batch[i] = horizontal_flip(x_batch[i])
-                        save_image(x_batch[i], 'img_tmp/'+str(i)+'.png')
+                        if not TEST_ON_RPI:
+                            save_image(x_batch[i], 'img_tmp/'+str(i)+'.png')
 
                     feed_dict = {x : x_batch,
                                  y : y_batch,
@@ -342,35 +347,45 @@ def main():
                 total_tra_acu = np.average(np.asarray(tra_accuracy))
 
                 if (epoch%1==0):
-                    val_loss = []
-                    val_accuracy = []
-                    #for step in tqdm(range(steps_per_epoch_val)):
-                    for step in range(steps_per_epoch_val):
-                        x_batch = x_test[batch_size*step: batch_size*(step+1)]
-                        y_batch = y_test[batch_size*step: batch_size*(step+1)]
+                    if not TEST_ON_RPI:
+                        val_loss = []
+                        val_accuracy = []
+                        #for step in tqdm(range(steps_per_epoch_val)):
+                        for step in range(steps_per_epoch_val):
+                            x_batch = x_test[batch_size*step: batch_size*(step+1)]
+                            y_batch = y_test[batch_size*step: batch_size*(step+1)]
 
-                        feed_dict = {x : x_batch,
-                                     y : y_batch,
-                                     is_training : False}
-                        tmp_loss,tmp_acu = sess.run([loss, accuracy], feed_dict=feed_dict)
-                        val_loss.append(tmp_loss)
-                        val_accuracy.append(tmp_acu)
+                            feed_dict = {x : x_batch,
+                                         y : y_batch,
+                                         is_training : False}
+                            tmp_loss,tmp_acu = sess.run([loss, accuracy], feed_dict=feed_dict)
+                            val_loss.append(tmp_loss)
+                            val_accuracy.append(tmp_acu)
 
-                    total_val_loss = np.average(np.asarray(val_loss))
-                    total_val_acu = np.average(np.asarray(val_accuracy))
-                    val_accuracy_list.append(total_val_acu)
+                        total_val_loss = np.average(np.asarray(val_loss))
+                        total_val_acu = np.average(np.asarray(val_accuracy))
+                        val_accuracy_list.append(total_val_acu)
 
-                    epoch_finish = time.time()
-                    print("time:{:4.4f} tra_loss:{:0.4f} tra_acc:{:0.4f} val_loss:{:0.4f} val_acc:{:0.4f}".format(
-                        epoch_finish-epoch_start,
-                        total_tra_loss,
-                        total_tra_acu,
-                        total_val_loss,
-                        total_val_acu))
-                    assert not (np.isnan(total_tra_loss))
-                    assert not (np.isnan(total_tra_acu))
-                    assert not (np.isnan(total_val_loss))
-                    assert not (np.isnan(total_val_acu))
+                        epoch_finish = time.time()
+                        print("time:{:4.4f} tra_loss:{:0.4f} tra_acc:{:0.4f} val_loss:{:0.4f} val_acc:{:0.4f}".format(
+                            epoch_finish-epoch_start,
+                            total_tra_loss,
+                            total_tra_acu,
+                            total_val_loss,
+                            total_val_acu))
+                        assert not (np.isnan(total_tra_loss))
+                        assert not (np.isnan(total_tra_acu))
+                        assert not (np.isnan(total_val_loss))
+                        assert not (np.isnan(total_val_acu))
+                    else:
+                        epoch_finish = time.time()
+                        print("time:{:4.4f} tra_loss:{:0.4f} tra_acc:{:0.4f}".format(
+                            epoch_finish-epoch_start,
+                            total_tra_loss,
+                            total_tra_acu))
+                        assert not (np.isnan(total_tra_loss))
+                        assert not (np.isnan(total_tra_acu))
+
 
 if __name__ == '__main__':
     main()
