@@ -18,6 +18,11 @@ from scipy.misc import imresize
 from scipy.ndimage.interpolation import rotate
 import argparse
 
+from tensorflow.python import debug as tf_debug
+from tensorflow.python.debug.lib.debug_data import has_inf_or_nan
+
+DEBUG = False
+
 cifarpath = "./data/cifar-10-batches-py"
 (IMG_HEIGHT, IMG_WIDTH, N_CHANNELS) = (224, 224, 3)
 
@@ -288,8 +293,10 @@ def main():
 
         ##########################################################################################
 
+        config = tf.ConfigProto()
+        config.gpu_options.allow_growth = True
 
-        with tf.Session(graph=graph) as sess:
+        with tf.Session(graph=graph, config=config) as sess:
             if not TEST_ON_RPI:
                 with tf.variable_scope('tensorboard') as scope:
                     tf.summary_write = tf.summary.FileWriter('logs', graph=sess.graph)
@@ -303,6 +310,10 @@ def main():
                     #writer = tf.train.SummaryWrite("logs", sess.graph_def)
 
             global n_epochs
+
+            if DEBUG:
+                sess = tf_debug.LocalCLIDebugWrapperSession(sess)
+                sess.add_tensor_filter('has_inf_or_nan', has_inf_or_nan)
 
             if TEST_ON_RPI:
                 n_epochs = 10 # For RPI
